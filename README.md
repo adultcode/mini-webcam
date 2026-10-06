@@ -71,8 +71,10 @@ lib/
     ui/screens/, ui/widgets/   phone screens and their widgets
   desktop/
     services/                  native receiver channel, adb, discovery, phone API, driver installer
-    providers/                 DesktopProvider
-    ui/screens/, ui/widgets/   desktop window and its widgets
+    providers/                 DesktopProvider (device state), StudioViewProvider (view state)
+    ui/theme/                  studio colours and theme
+    ui/screens/                studio layout
+    ui/widgets/                common/, header/, device/, viewport/, tuner/, layout/
 android/app/src/main/kotlin/com/adultcode/miniwebcam/
   CameraPlugin.kt              method channel "miniwebcam/camera"
   camera/CameraEngine.kt       Camera2 session, preview texture, 3A controls
