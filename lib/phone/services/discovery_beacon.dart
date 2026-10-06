@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import '../shared/protocol.dart';
+import '../../core/protocol.dart';
 
 /// Announces the phone on the LAN so the desktop can list it without typing an IP.
 /// Broadcasts a small JSON beacon every 2 s and answers desktop probes directly.
@@ -27,7 +27,11 @@ class DiscoveryBeacon {
         final d = socket.receive();
         if (d == null) return;
         if (utf8.decode(d.data, allowMalformed: true) == FcamDiscovery.probe) {
-          socket.send(_message(), d.address, d.port);
+          try {
+            socket.send(_message(), d.address, d.port);
+          } on SocketException {
+            // Network blocked (e.g. phone asleep); the next probe gets an answer.
+          }
         }
       });
       _socket = socket;

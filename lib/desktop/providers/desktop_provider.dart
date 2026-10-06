@@ -3,16 +3,18 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../shared/protocol.dart';
-import 'adb.dart';
-import 'discovery_listener.dart';
-import 'phone_api.dart';
-import 'receiver_channel.dart';
-import 'virtual_cam_installer.dart';
+import '../../core/protocol.dart';
+import '../services/adb.dart';
+import '../services/discovery_listener.dart';
+import '../services/phone_api.dart';
+import '../services/receiver_channel.dart';
+import '../services/virtual_cam_installer.dart';
 
 enum ConnectionMode { wifi, usb }
 
-class DesktopController extends ChangeNotifier {
+/// Desktop-side state: receiver, connection, adb, discovery and output options.
+/// Exposed to the UI with `ChangeNotifierProvider<DesktopProvider>`.
+class DesktopProvider extends ChangeNotifier {
   final receiver = ReceiverChannel();
   final adb = Adb();
   final discovery = DiscoveryListener();
@@ -48,6 +50,12 @@ class DesktopController extends ChangeNotifier {
 
   bool get driverInstalled =>
       systemCameras.contains(VirtualCamInstaller.deviceName);
+
+  /// Loads saved settings, starts discovery, then applies startup arguments.
+  Future<void> start(List<String> args) async {
+    await init();
+    await autoConnect(args);
+  }
 
   Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();

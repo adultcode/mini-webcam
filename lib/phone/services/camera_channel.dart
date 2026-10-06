@@ -1,6 +1,6 @@
 import 'package:flutter/services.dart';
 
-import '../shared/models.dart';
+import '../../core/models/camera_models.dart';
 
 /// Thin wrapper over the native Android pipeline (CameraPlugin.kt).
 /// Only control messages go through here; frames stay native.

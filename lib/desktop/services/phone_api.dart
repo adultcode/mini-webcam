@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import '../shared/models.dart';
+import '../../core/models/camera_models.dart';
 
 /// HTTP client for the phone's control API (see lib/phone/control_server.dart).
 class PhoneApi {

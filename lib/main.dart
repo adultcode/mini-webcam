@@ -1,10 +1,6 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 
-import 'desktop/desktop_home.dart';
-import 'phone/phone_home.dart';
-import 'shared/theme.dart';
+import 'app.dart';
 
 /// One codebase, two roles:
 ///  - Android: turns the phone into a camera server (capture + hardware encode + stream)
@@ -15,20 +11,4 @@ import 'shared/theme.dart';
 void main(List<String> args) {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(MiniWebcamApp(args: args));
-}
-
-class MiniWebcamApp extends StatelessWidget {
-  const MiniWebcamApp({super.key, this.args = const []});
-
-  final List<String> args;
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Mini Webcam',
-      debugShowCheckedModeBanner: false,
-      theme: buildTheme(),
-      home: Platform.isAndroid ? const PhoneHome() : DesktopHome(args: args),
-    );
-  }
 }

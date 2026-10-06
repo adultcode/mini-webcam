@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import '../shared/protocol.dart';
+import '../../core/protocol.dart';
 
 class DiscoveredPhone {
   DiscoveredPhone(this.address, this.name, this.streaming, this.lastSeen);

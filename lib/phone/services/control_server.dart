@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import '../shared/protocol.dart';
+import '../../core/protocol.dart';
 
 /// JSON control API served by the phone on [FcamPorts.controlPort].
 ///

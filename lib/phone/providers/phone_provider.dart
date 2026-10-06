@@ -2,19 +2,25 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
-import '../shared/models.dart';
-import '../shared/protocol.dart';
-import 'camera_channel.dart';
-import 'control_server.dart';
-import 'discovery_beacon.dart';
+import '../../core/models/camera_models.dart';
+import '../../core/protocol.dart';
+import '../services/camera_channel.dart';
+import '../services/control_server.dart';
+import '../services/discovery_beacon.dart';
 
-/// Owns the phone-side state: native camera, control server and discovery.
-class PhoneController extends ChangeNotifier {
+/// Phone-side state: native camera, control server and LAN discovery.
+/// Exposed to the UI with `ChangeNotifierProvider<PhoneProvider>`.
+class PhoneProvider extends ChangeNotifier {
+  PhoneProvider() {
+    _lifecycle = AppLifecycleListener(onResume: onResume);
+  }
+
   final _camera = CameraChannel();
+  late final AppLifecycleListener _lifecycle;
   late final ControlServer _server = ControlServer(
     info: _info,
     status: () async => _stats,
@@ -47,6 +53,7 @@ class PhoneController extends ChangeNotifier {
   List<String> addresses = const [];
   Timer? _statsTimer;
 
+  int get viewers => fcamClients + mjpegClients;
   int get fcamClients => (_stats['fcamClients'] as num?)?.toInt() ?? 0;
   int get mjpegClients => (_stats['mjpegClients'] as num?)?.toInt() ?? 0;
   double get fps => (_stats['fps'] as num?)?.toDouble() ?? 0;
@@ -186,6 +193,7 @@ class PhoneController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _lifecycle.dispose();
     _statsTimer?.cancel();
     _beacon.stop();
     _server.stop();

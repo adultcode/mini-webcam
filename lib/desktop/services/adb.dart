@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
-import '../shared/protocol.dart';
+import '../../core/protocol.dart';
 
 class AdbDevice {
   const AdbDevice(this.serial, this.model, this.state);

@@ -63,10 +63,16 @@ Command line: `mini-webcam.exe --usb` or `mini-webcam.exe --connect=192.168.1.20
 
 ```
 lib/
-  main.dart                    picks the phone or desktop UI
-  shared/                      models, ports, theme
-  phone/                       phone UI, control HTTP server, discovery beacon
-  desktop/                     receiver UI, adb, discovery, phone API client, driver installer
+  main.dart, app.dart          entry point; picks the phone or desktop role and its providers
+  core/                        shared models, ports, theme, common widgets
+  phone/
+    services/                  native camera channel, control HTTP server, discovery beacon
+    providers/                 PhoneProvider, BlackoutProvider (state, via provider)
+    ui/screens/, ui/widgets/   phone screens and their widgets
+  desktop/
+    services/                  native receiver channel, adb, discovery, phone API, driver installer
+    providers/                 DesktopProvider
+    ui/screens/, ui/widgets/   desktop window and its widgets
 android/app/src/main/kotlin/com/adultcode/miniwebcam/
   CameraPlugin.kt              method channel "miniwebcam/camera"
   camera/CameraEngine.kt       Camera2 session, preview texture, 3A controls
