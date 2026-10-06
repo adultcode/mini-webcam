@@ -57,9 +57,9 @@ jobs:
       BUILD_NAME: ${{ needs.version.outputs.name }}
       BUILD_NUMBER: ${{ needs.version.outputs.number }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "21"
@@ -125,7 +125,7 @@ jobs:
         if: always()
         run: rm -f "$RUNNER_TEMP/release.keystore"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: android
           path: dist/*
@@ -146,7 +146,7 @@ jobs:
       run:
         shell: pwsh
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: subosito/flutter-action@v2
         with:
@@ -215,12 +215,14 @@ jobs:
           }
           $out.Close()
 
-          Get-ChildItem dist | ForEach-Object {
+          # Hash first, write after: the sums file must not be in the listing.
+          $sums = Get-ChildItem dist -File | ForEach-Object {
             "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name
-          } | Out-File -Encoding ascii "dist\$base-SHA256SUMS.txt"
+          }
+          $sums | Out-File -Encoding ascii "dist\$base-SHA256SUMS.txt"
           Get-ChildItem dist
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: windows
           path: dist/*
