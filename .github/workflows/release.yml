@@ -161,10 +161,11 @@ jobs:
 
       - name: Download packaging tools
         run: |
-          # Pinned by SHA-256 so a tampered download fails the build.
+          # Versioned release assets (immutable), pinned by SHA-256 so a tampered
+          # download fails the build. Unversioned URLs change on every 7-Zip release.
           $tools = @(
-            @{ Url = 'https://www.7-zip.org/a/7zr.exe';  File = '7zr.exe';    Sha = 'AD4C82FADCBDF93C03B4FC440F300509C7D60C5C2F4D183E35D9D70D6957037D' },
-            @{ Url = 'https://www.7-zip.org/a/lzma2501.7z'; File = 'lzma.7z'; Sha = 'CBC3BABD589D971E45971D787FF100BE8AAA5EAB15B2694497EC3E447009E1F2' },
+            @{ Url = 'https://github.com/ip7z/7zip/releases/download/25.01/7zr.exe'; File = '7zr.exe'; Sha = '27CBE3D5804AD09E90BBCAA916DA0D5C3B0BE9462D0E0FB6CB54BE5ED9030875' },
+            @{ Url = 'https://github.com/ip7z/7zip/releases/download/25.01/lzma2501.7z'; File = 'lzma.7z'; Sha = 'CBC3BABD589D971E45971D787FF100BE8AAA5EAB15B2694497EC3E447009E1F2' },
             @{ Url = 'https://github.com/electron/rcedit/releases/download/v2.0.0/rcedit-x64.exe'; File = 'rcedit.exe'; Sha = '3E7801DB1A5EDBEC91B49A24A094AAD776CB4515488EA5A4CA2289C400EADE2A' }
           )
           $dir = Join-Path $env:RUNNER_TEMP 'tools'
