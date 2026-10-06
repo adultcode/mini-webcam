@@ -111,9 +111,11 @@ jobs:
 
       - name: Verify signatures
         run: |
-          apksigner="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -n1)apksigner"
+          apksigner="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n1)"
+          echo "Using $apksigner"
           for apk in dist/*.apk; do
-            "$apksigner" verify --print-certs "$apk" | grep -E "Signer #1 certificate (DN|SHA-256)"
+            echo "== $apk"
+            "$apksigner" verify --print-certs "$apk"
           done
 
       - name: Checksums

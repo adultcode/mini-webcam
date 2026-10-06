@@ -6,13 +6,19 @@ project(runner LANGUAGES CXX)
 # work.
 #
 # Any new source files that you add to the application should be added here.
+# plugin_registrar.cc is produced by flutter_assemble during the build, so on a
+# clean checkout it doesn't exist yet when CMake configures.
+set(PLUGIN_REGISTRAR_SOURCE
+  "${FLUTTER_MANAGED_DIR}/ephemeral/cpp_client_wrapper/plugin_registrar.cc")
+set_source_files_properties("${PLUGIN_REGISTRAR_SOURCE}" PROPERTIES GENERATED TRUE)
+
 add_executable(${BINARY_NAME} WIN32
   "fcam/decoders.cpp"
   "fcam/receiver.cpp"
   "fcam/receiver_plugin.cpp"
   "fcam/virtual_camera.cpp"
   # In-app plugin needs the registrar half of the C++ wrapper.
-  "${FLUTTER_MANAGED_DIR}/ephemeral/cpp_client_wrapper/plugin_registrar.cc"
+  "${PLUGIN_REGISTRAR_SOURCE}"
   "flutter_window.cpp"
   "main.cpp"
   "utils.cpp"
