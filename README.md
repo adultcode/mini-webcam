@@ -1,4 +1,6 @@
 # Mini Webcam
+<img width="1672" height="941" alt="Mini Webcam_ Connect Easily, Capture Clearly" src="https://github.com/user-attachments/assets/d9c07e8a-0ece-4a9c-994c-605f581c61b9" />
+
 
 Use your Android phone as a webcam on Windows. A Flutter rewrite of
 [Android-Webcam-Project](https://github.com/soubhagyajit/Android-Webcam-Project), with a new
