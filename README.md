@@ -67,8 +67,10 @@ lib/
   core/                        shared models, ports, theme, common widgets
   phone/
     services/                  native camera channel, control HTTP server, discovery beacon
-    providers/                 PhoneProvider, BlackoutProvider (state, via provider)
-    ui/screens/, ui/widgets/   phone screens and their widgets
+    providers/                 PhoneProvider, BlackoutProvider, PhoneViewProvider
+    ui/theme/                  OLED colours and theme
+    ui/screens/                viewfinder and permission screens
+    ui/widgets/                common/, viewport/, header/, hud/, controls/, overlays/, settings/
   desktop/
     services/                  native receiver channel, adb, discovery, phone API, driver installer
     providers/                 DesktopProvider (device state), StudioViewProvider (view state)
