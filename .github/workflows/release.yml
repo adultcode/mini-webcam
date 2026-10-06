@@ -1,0 +1,230 @@
+name: Release
+
+# Builds signed Android APKs and Windows packages, then attaches them to the
+# GitHub release that triggered the run.
+#
+# Required repository secrets (Settings > Secrets and variables > Actions):
+#   ANDROID_KEYSTORE_BASE64    base64 of the release keystore file
+#   ANDROID_KEYSTORE_PASSWORD  keystore password
+#   ANDROID_KEY_ALIAS          key alias
+#   ANDROID_KEY_PASSWORD       key password
+#
+# Run it manually (workflow_dispatch) to get the same files as workflow
+# artifacts without publishing a release.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  FLUTTER_VERSION: "3.47.2"
+  APP_NAME: mini-webcam
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      name: ${{ steps.v.outputs.name }}
+      number: ${{ steps.v.outputs.number }}
+      tag: ${{ steps.v.outputs.tag }}
+    steps:
+      - id: v
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          if [ -n "$TAG" ]; then
+            name="${TAG#v}"
+          else
+            name="0.0.0-dev"
+          fi
+          # Flutter build names must look like 1.2.3 (optionally -suffix).
+          if ! echo "$name" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$'; then
+            echo "::error::Release tag '$TAG' must look like v1.2.3"
+            exit 1
+          fi
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "number=${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+  android:
+    needs: version
+    runs-on: ubuntu-latest
+    env:
+      BUILD_NAME: ${{ needs.version.outputs.name }}
+      BUILD_NUMBER: ${{ needs.version.outputs.number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Restore signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
+            echo "::error::Android signing secrets are missing"
+            exit 1
+          fi
+          keystore="$RUNNER_TEMP/release.keystore"
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          {
+            echo "ANDROID_KEYSTORE_PATH=$keystore"
+            echo "ANDROID_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
+            echo "ANDROID_KEY_ALIAS=$KEY_ALIAS"
+            echo "ANDROID_KEY_PASSWORD=$KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+
+      - run: flutter pub get
+
+      - name: Build universal APK
+        run: flutter build apk --release --build-name="$BUILD_NAME" --build-number="$BUILD_NUMBER"
+
+      - name: Keep universal APK
+        run: |
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/app-release.apk "dist/$APP_NAME-$BUILD_NAME-android-universal.apk"
+
+      - name: Build per-ABI APKs
+        run: flutter build apk --release --split-per-abi --build-name="$BUILD_NAME" --build-number="$BUILD_NUMBER"
+
+      - name: Collect per-ABI APKs
+        run: |
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            cp "build/app/outputs/flutter-apk/app-$abi-release.apk" "dist/$APP_NAME-$BUILD_NAME-android-$abi.apk"
+          done
+
+      - name: Verify signatures
+        run: |
+          apksigner="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -n1)apksigner"
+          for apk in dist/*.apk; do
+            "$apksigner" verify --print-certs "$apk" | grep -E "Signer #1 certificate (DN|SHA-256)"
+          done
+
+      - name: Checksums
+        run: cd dist && sha256sum *.apk > "$APP_NAME-$BUILD_NAME-android-SHA256SUMS.txt"
+
+      - name: Remove signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.keystore"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: dist/*
+
+      - name: Attach to release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ needs.version.outputs.tag }}" dist/* --clobber
+
+  windows:
+    needs: version
+    runs-on: windows-latest
+    env:
+      BUILD_NAME: ${{ needs.version.outputs.name }}
+      BUILD_NUMBER: ${{ needs.version.outputs.number }}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - run: flutter pub get
+
+      - name: Build
+        run: flutter build windows --release --build-name="$env:BUILD_NAME" --build-number="$env:BUILD_NUMBER"
+
+      - name: Download packaging tools
+        run: |
+          # Pinned by SHA-256 so a tampered download fails the build.
+          $tools = @(
+            @{ Url = 'https://www.7-zip.org/a/7zr.exe';  File = '7zr.exe';    Sha = 'AD4C82FADCBDF93C03B4FC440F300509C7D60C5C2F4D183E35D9D70D6957037D' },
+            @{ Url = 'https://www.7-zip.org/a/lzma2501.7z'; File = 'lzma.7z'; Sha = 'CBC3BABD589D971E45971D787FF100BE8AAA5EAB15B2694497EC3E447009E1F2' },
+            @{ Url = 'https://github.com/electron/rcedit/releases/download/v2.0.0/rcedit-x64.exe'; File = 'rcedit.exe'; Sha = '3E7801DB1A5EDBEC91B49A24A094AAD776CB4515488EA5A4CA2289C400EADE2A' }
+          )
+          $dir = Join-Path $env:RUNNER_TEMP 'tools'
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          foreach ($t in $tools) {
+            $path = Join-Path $dir $t.File
+            Invoke-WebRequest -Uri $t.Url -OutFile $path
+            $hash = (Get-FileHash $path -Algorithm SHA256).Hash
+            if ($hash -ne $t.Sha) { throw "Checksum mismatch for $($t.File): $hash" }
+          }
+          & "$dir\7zr.exe" e -y "-o$dir" "$dir\lzma.7z" 'bin\7zSD.sfx' | Out-Null
+          if (-not (Test-Path "$dir\7zSD.sfx")) { throw '7zSD.sfx not found in LZMA SDK' }
+          "TOOLS=$dir" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+
+      - name: Package
+        run: |
+          $release = 'build\windows\x64\runner\Release'
+          $base = "$env:APP_NAME-$env:BUILD_NAME-windows-x64"
+          New-Item -ItemType Directory -Force dist | Out-Null
+
+          # 1. Folder build as a zip: extract anywhere and run mini-webcam.exe.
+          $staging = Join-Path $env:RUNNER_TEMP $env:APP_NAME
+          Copy-Item $release $staging -Recurse
+          Compress-Archive -Path $staging -DestinationPath "dist\$base.zip"
+
+          # 2. Single-file portable exe: 7-Zip SFX that unpacks to %TEMP%,
+          #    runs the app, and cleans up when it exits.
+          $stub = Join-Path $env:TOOLS 'stub.sfx'
+          Copy-Item "$env:TOOLS\7zSD.sfx" $stub
+          & "$env:TOOLS\rcedit.exe" $stub `
+            --set-icon 'windows\runner\resources\app_icon.ico' `
+            --set-version-string ProductName 'Mini Webcam' `
+            --set-version-string FileDescription 'Mini Webcam' `
+            --set-version-string CompanyName 'adultcode' `
+            --set-version-string InternalName $env:APP_NAME `
+            --set-version-string OriginalFilename "$base-portable.exe" `
+            --set-file-version $env:BUILD_NAME.Split('-')[0] `
+            --set-product-version $env:BUILD_NAME `
+            --application-manifest 'windows\packaging\portable.manifest'
+          if ($LASTEXITCODE -ne 0) { throw 'rcedit failed' }
+          $archive = Join-Path $env:RUNNER_TEMP 'app.7z'
+          & "$env:TOOLS\7zr.exe" a -mx=7 $archive "$release\*" | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw '7zr failed' }
+          $out = [IO.File]::Create("dist\$base-portable.exe")
+          foreach ($part in @($stub, 'windows\packaging\sfx_config.txt', $archive)) {
+            $bytes = [IO.File]::ReadAllBytes((Resolve-Path $part))
+            $out.Write($bytes, 0, $bytes.Length)
+          }
+          $out.Close()
+
+          Get-ChildItem dist | ForEach-Object {
+            "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name
+          } | Out-File -Encoding ascii "dist\$base-SHA256SUMS.txt"
+          Get-ChildItem dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/*
+
+      - name: Attach to release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ needs.version.outputs.tag }}" (Get-ChildItem dist).FullName --clobber

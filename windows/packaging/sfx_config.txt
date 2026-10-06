@@ -1,0 +1,5 @@
+;!@Install@!UTF-8!
+Title="Mini Webcam"
+RunProgram="mini-webcam.exe"
+GUIMode="2"
+;!@InstallEnd@!
