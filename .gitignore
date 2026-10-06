@@ -61,3 +61,7 @@ key.properties
 # Source artwork kept locally; generated icons live under android/ and windows/.
 /mini-webcam-circle.png
 /mini-webcam-transparent.png
+
+# Built from source by windows/third_party/softcam/build_softcam.ps1
+/windows/third_party/softcam/softcam.dll
+

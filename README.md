@@ -7,7 +7,7 @@ native streaming pipeline on both sides.
 | Platform | Role |
 |---|---|
 | Android | Camera server: Camera2 capture, hardware H.264 encoding, network stream |
-| Windows | Receiver: native decoding, live preview, and the **DirectShow Softcam** virtual webcam for Zoom, Teams, Meet, OBS and Discord |
+| Windows | Receiver: native decoding, live preview, and the **Mini Webcam** virtual camera for Zoom, Teams, Meet, OBS and Discord |
 
 ## Download
 
@@ -32,7 +32,7 @@ Each platform also ships a `SHA256SUMS.txt` file.
    - **Wi-Fi**: the phone shows up in the list on its own. You can also type its IP.
    - **USB**: turn on USB debugging, plug in the phone, and click **Connect**. If the app is not running on the phone, the PC opens it over adb. This needs adb: either Android platform-tools, or `adb\adb.exe` placed next to the app.
 4. The PC starts the phone stream itself; you don't need to touch the phone.
-5. Click **Install driver** once (Windows asks for admin rights). Then pick **DirectShow Softcam** as the camera in your video app.
+5. Click **Install driver** once (Windows asks for admin rights). Then pick **Mini Webcam** as the camera in your video app. Keep the phone unlocked with the app open: Android stops the camera when the screen turns off.
 
 Command line: `mini-webcam.exe --usb` or `mini-webcam.exe --connect=192.168.1.20` connects at startup.
 
@@ -77,7 +77,7 @@ windows/runner/fcam/
   virtual_camera.cpp           softcam.dll loader and sender thread
   receiver_plugin.cpp          method channel "miniwebcam/receiver"
 windows/packaging/             portable exe manifest and self-extractor config
-windows/third_party/softcam/   softcam.dll (tshino/softcam, MIT)
+windows/third_party/softcam/   build_softcam.ps1: builds the camera DLL from tshino/softcam (MIT)
 ```
 
 ## Building
@@ -107,13 +107,13 @@ Required repository secrets: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWO
 ## Known limits
 
 - Streaming stops when the phone app goes to the background, because Android blocks camera access for background apps. Keep the app open; the blackout mode saves power.
-- The bundled Softcam is 64-bit, so 32-bit apps won't list the camera.
+- The virtual camera is 64-bit, so 32-bit apps won't list it.
 - The control API has no authentication. Use it only on networks you trust.
 
 ## Credits
 
 - [Android-Webcam-Project](https://github.com/soubhagyajit/Android-Webcam-Project), the original idea and design
-- [Softcam](https://github.com/tshino/softcam), the DirectShow virtual camera (MIT)
+- [Softcam](https://github.com/tshino/softcam), the DirectShow virtual camera our driver is built from (MIT). The Windows build compiles it from source, renamed to Mini Webcam with its own CLSID and a static runtime.
 
 ## License
 

@@ -47,7 +47,7 @@ class DesktopController extends ChangeNotifier {
   bool driverBusy = false;
 
   bool get driverInstalled =>
-      systemCameras.any((c) => c.toLowerCase().contains('softcam'));
+      systemCameras.contains(VirtualCamInstaller.deviceName);
 
   Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
@@ -263,7 +263,7 @@ class DesktopController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Only feed Softcam when its driver is registered; otherwise no app can
+  /// Only feed the virtual camera when its driver is registered; otherwise no app can
   /// read the frames and the BGR conversion is wasted CPU.
   Future<void> _syncVirtualCamera() =>
       receiver.setVirtualCamera(vcamEnabled && driverInstalled);

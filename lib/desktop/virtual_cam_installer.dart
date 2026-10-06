@@ -2,59 +2,86 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
-/// Registers / unregisters the Softcam DirectShow filter so that apps like Zoom,
-/// Teams, Meet (in Chrome/Edge), Discord and OBS can pick "DirectShow Softcam".
+/// Registers / unregisters the "Mini Webcam" DirectShow camera so apps like
+/// Zoom, Teams, Meet (in Chrome/Edge), Discord and OBS can pick it.
 ///
-/// The DLL is copied to %LOCALAPPDATA%\MiniWebcam first so the registration keeps
-/// working when the app folder is moved or updated. Registration needs admin
-/// rights once, so Windows shows a UAC prompt.
+/// The camera DLL (our softcam build, see windows/third_party/softcam) is copied
+/// to %LOCALAPPDATA%\MiniWebcam first, so the registration keeps working when
+/// the app folder moves, and when the portable build runs from a temp folder.
+/// Registration needs admin rights, so Windows shows one UAC prompt.
 class VirtualCamInstaller {
-  static const deviceName = 'DirectShow Softcam';
+  /// Name other apps show in their camera list.
+  static const deviceName = 'Mini Webcam';
 
   static String get _bundledDll =>
       p.join(p.dirname(Platform.resolvedExecutable), 'softcam.dll');
 
-  static String get _installedDll => p.join(
+  static String get _installDir => p.join(
       Platform.environment['LOCALAPPDATA'] ?? p.dirname(Platform.resolvedExecutable),
-      'MiniWebcam',
-      'softcam.dll');
+      'MiniWebcam');
+
+  static String get _installedDll => p.join(_installDir, 'mini-webcam-camera.dll');
+
+  /// Earlier builds installed a third-party DLL under this name ("AWC Virtual Cam").
+  static String get _legacyDll => p.join(_installDir, 'softcam.dll');
 
   static Future<void> install() async {
     final source = File(_bundledDll);
     if (!await source.exists()) {
       throw const FileSystemException('softcam.dll is missing next to mini-webcam.exe');
     }
-    final target = File(_installedDll);
-    await target.parent.create(recursive: true);
+    await Directory(_installDir).create(recursive: true);
     try {
-      await source.copy(target.path);
+      await source.copy(_installedDll);
     } on FileSystemException {
-      // Already registered and loaded by some app; the existing copy is fine.
-      if (!await target.exists()) rethrow;
+      throw const FileSystemException(
+          'The camera is in use. Close apps that use it (Zoom, Teams, OBS, browser) and retry.');
     }
-    await _regsvr32(['/s', target.path]);
+    await _elevated([
+      if (await File(_legacyDll).exists()) _regsvr32(['/u', _legacyDll], check: false),
+      _regsvr32([_installedDll]),
+    ]);
   }
 
   static Future<void> uninstall() async {
-    final target = File(_installedDll);
-    if (!await target.exists()) return;
-    await _regsvr32(['/u', '/s', target.path]);
+    await _elevated([
+      if (await File(_legacyDll).exists()) _regsvr32(['/u', _legacyDll], check: false),
+      if (await File(_installedDll).exists()) _regsvr32(['/u', _installedDll]),
+    ]);
   }
 
-  static Future<void> _regsvr32(List<String> args) async {
-    // PowerShell single-quoted strings; paths get inner double quotes for regsvr32.
+  /// One PowerShell line that runs regsvr32 silently and, if [check], fails
+  /// the script with regsvr32's exit code.
+  static String _regsvr32(List<String> args, {bool check = true}) {
     final quoted = args
         .map((a) => a.startsWith('/') ? "'$a'" : "'\"${a.replaceAll("'", "''")}\"'")
         .join(',');
-    final script = r'$p = Start-Process -FilePath regsvr32.exe -Verb RunAs -Wait -PassThru '
-        '-ArgumentList $quoted; exit \$p.ExitCode';
-    final r = await Process.run(
-      'powershell.exe',
-      ['-NoProfile', '-NonInteractive', '-Command', script],
-    );
-    if (r.exitCode != 0) {
-      throw ProcessException('regsvr32', args,
-          'regsvr32 failed (exit ${r.exitCode}). Was the admin prompt declined?', r.exitCode);
+    final run = "\$p = Start-Process regsvr32.exe -ArgumentList '/s',$quoted -Wait -PassThru";
+    return check ? '$run; if (\$p.ExitCode -ne 0) { exit \$p.ExitCode }' : run;
+  }
+
+  /// Runs [lines] in a single elevated PowerShell (one UAC prompt).
+  static Future<void> _elevated(List<String> lines) async {
+    if (lines.isEmpty) return;
+    final script = File(p.join(Directory.systemTemp.path, 'mini-webcam-camera-$pid.ps1'));
+    await script.writeAsString([...lines, 'exit 0'].join('\n'));
+    try {
+      final launcher = "\$p = Start-Process powershell.exe -Verb RunAs -Wait -PassThru "
+          "-WindowStyle Hidden -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass',"
+          "'-File','\"${script.path.replaceAll("'", "''")}\"'; exit \$p.ExitCode";
+      final r = await Process.run(
+        'powershell.exe',
+        ['-NoProfile', '-NonInteractive', '-Command', launcher],
+      );
+      if (r.exitCode != 0) {
+        throw ProcessException('regsvr32', const [],
+            'Camera registration failed (code ${r.exitCode}). Was the admin prompt declined?',
+            r.exitCode);
+      }
+    } finally {
+      try {
+        await script.delete();
+      } catch (_) {}
     }
   }
 }

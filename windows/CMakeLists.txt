@@ -87,8 +87,20 @@ if(PLUGIN_BUNDLED_LIBRARIES)
     COMPONENT Runtime)
 endif()
 
-# Softcam virtual webcam (https://github.com/tshino/softcam, MIT license).
-install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/third_party/softcam/softcam.dll"
+# "Mini Webcam" virtual camera: built from the official softcam source
+# (https://github.com/tshino/softcam, MIT) on first configure, never committed.
+set(SOFTCAM_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/softcam")
+if(NOT EXISTS "${SOFTCAM_DIR}/softcam.dll")
+  message(STATUS "Building softcam.dll from source...")
+  execute_process(
+    COMMAND powershell -NoProfile -ExecutionPolicy Bypass
+            -File "${SOFTCAM_DIR}/build_softcam.ps1"
+    RESULT_VARIABLE SOFTCAM_RESULT)
+  if(NOT SOFTCAM_RESULT EQUAL 0)
+    message(FATAL_ERROR "softcam.dll build failed (see output above)")
+  endif()
+endif()
+install(FILES "${SOFTCAM_DIR}/softcam.dll"
   DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
   COMPONENT Runtime)
 
