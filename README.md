@@ -3,7 +3,8 @@
 
 
 Use your Android phone as a webcam on Windows. A Flutter rewrite of
-[Android-Webcam-Project](https://github.com/soubhagyajit/Android-Webcam-Project), with a new
+
+<img width="1672" height="941" alt="93306f94-5536-4432-81e5-e65a69097310" src="https://github.com/user-attachments/assets/1a73b6e8-8b5d-449c-9a12-bcefbf76919a" />
 native streaming pipeline on both sides.
 
 | Platform | Role |
