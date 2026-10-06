@@ -206,8 +206,15 @@ jobs:
             --application-manifest 'windows\packaging\portable.manifest'
           if ($LASTEXITCODE -ne 0) { throw 'rcedit failed' }
           $archive = Join-Path $env:RUNNER_TEMP 'app.7z'
-          & "$env:TOOLS\7zr.exe" a -mx=7 $archive "$release\*" | Out-Null
-          if ($LASTEXITCODE -ne 0) { throw '7zr failed' }
+          # Archive from inside the folder so entries sit at the root
+          # (a relative source path would be stored as a prefix).
+          Push-Location $release
+          & "$env:TOOLS\7zr.exe" a -mx=7 $archive * | Out-Null
+          $code = $LASTEXITCODE
+          Pop-Location
+          if ($code -ne 0) { throw '7zr failed' }
+          $listing = & "$env:TOOLS\7zr.exe" l $archive
+          if (-not ($listing -match ' mini-webcam\.exe$')) { throw 'mini-webcam.exe is not at the archive root' }
           $out = [IO.File]::Create("dist\$base-portable.exe")
           foreach ($part in @($stub, 'windows\packaging\sfx_config.txt', $archive)) {
             $bytes = [IO.File]::ReadAllBytes((Resolve-Path $part))
