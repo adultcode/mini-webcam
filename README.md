@@ -46,7 +46,7 @@ Command line: `mini-webcam.exe --usb` or `mini-webcam.exe --connect=192.168.1.20
 - Native C++ frame path on Windows to the Flutter texture and the virtual camera. Dart only reads stats.
 - Automatic phone discovery on the LAN (UDP). In USB mode, ports are forwarded and the phone app is opened for you.
 - Change settings from the phone or the PC: camera, resolution, fps, codec, bitrate, zoom, torch, exposure and manual focus.
-- Rotate (0/90/180/270) or mirror the picture on the PC, show a rule-of-thirds grid, and save snapshots (PNG, to Pictures\Mini Webcam).
+- Rotate (0/90/180/270) or mirror the picture on the PC, change the output aspect (16:9, 4:3, 1:1; fit with bars or fill by cropping) so an upright phone still gives a landscape webcam, show a rule-of-thirds grid, and save snapshots (PNG, to Pictures\Mini Webcam).
 - MJPEG mode for browsers, OBS and VLC: `http://<phone-ip>:8081/video`.
 - On the phone: tap to focus, pinch to zoom, and the screen blacks out while streaming to save battery.
 

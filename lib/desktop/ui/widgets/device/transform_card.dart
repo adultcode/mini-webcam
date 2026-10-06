@@ -7,6 +7,7 @@ import '../common/inset_panel.dart';
 import '../common/pill_selector.dart';
 import '../common/studio_card.dart';
 import '../common/toggle_row.dart';
+import 'aspect_selector.dart';
 
 /// Rotation, mirror and preview options applied on the PC, plus decoder state.
 class TransformCard extends StatelessWidget {
@@ -36,6 +37,7 @@ class TransformCard extends StatelessWidget {
             onChanged: (v) => c.setTransform(rotation: v),
           ),
         ]),
+        const AspectSelector(),
         ToggleRow(
           title: 'Mirror Video Feed',
           subtitle: 'Flip horizontally, applied to the virtual camera too',

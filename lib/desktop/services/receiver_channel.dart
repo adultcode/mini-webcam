@@ -21,6 +21,10 @@ class ReceiverChannel {
   Future<void> setTransform({required int rotation, required bool mirror}) =>
       _channel.invokeMethod('setTransform', {'rotation': rotation, 'mirror': mirror});
 
+  /// Output aspect ratio; 0:0 keeps the camera's. [fill] crops, otherwise pads.
+  Future<void> setAspect({required int width, required int height, required bool fill}) =>
+      _channel.invokeMethod('setAspect', {'width': width, 'height': height, 'fill': fill});
+
   Future<void> setPreview(bool enabled) =>
       _channel.invokeMethod('setPreview', {'enabled': enabled});
 

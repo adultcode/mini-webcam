@@ -4,6 +4,8 @@
 #include <ppl.h>
 #include <ws2tcpip.h>
 
+#include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 
@@ -411,6 +413,8 @@ void Receiver::Present(const uint8_t* rgba, int width, int height) {
     h = oh;
   }
 
+  src = Reframe(src, &w, &h);
+
   ++frames_;
   {
     std::lock_guard<std::mutex> lock(status_mutex_);
@@ -430,6 +434,76 @@ void Receiver::Present(const uint8_t* rgba, int width, int height) {
     }
     textures_->MarkTextureFrameAvailable(texture_id_);
   }
+}
+
+void Receiver::SetAspect(int aspect_w, int aspect_h, bool fill) {
+  aspect_w_ = aspect_w > 0 && aspect_h > 0 ? aspect_w : 0;
+  aspect_h_ = aspect_w > 0 && aspect_h > 0 ? aspect_h : 0;
+  aspect_fill_ = fill;
+}
+
+// Fits (black bars) or fills (crops) the frame into the chosen aspect ratio.
+// The output keeps the source's short side, so a 1080x1920 portrait frame
+// becomes a standard 1920x1080 landscape frame. Bilinear resampling.
+const uint8_t* Receiver::Reframe(const uint8_t* src, int* width, int* height) {
+  const int aw = aspect_w_;
+  const int ah = aspect_h_;
+  if (aw <= 0 || ah <= 0) return src;
+  const int w = *width;
+  const int h = *height;
+  const double target = static_cast<double>(aw) / ah;
+  if (std::abs(static_cast<double>(w) / h - target) < 0.01) return src;
+
+  const int short_side = std::min(w, h);
+  int out_w = target >= 1.0 ? static_cast<int>(short_side * target + 0.5) : short_side;
+  int out_h = target >= 1.0 ? short_side : static_cast<int>(short_side / target + 0.5);
+  out_w &= ~1;
+  out_h &= ~1;
+
+  const double sx_scale = static_cast<double>(out_w) / w;
+  const double sy_scale = static_cast<double>(out_h) / h;
+  const double scale = aspect_fill_ ? std::max(sx_scale, sy_scale) : std::min(sx_scale, sy_scale);
+  const double off_x = (out_w - w * scale) / 2.0;
+  const double off_y = (out_h - h * scale) / 2.0;
+
+  reframed_.resize(static_cast<size_t>(out_w) * out_h * 4);
+  const uint8_t* in = src;
+  uint8_t* out = reframed_.data();
+  constexpr uint32_t kBlack = 0xFF000000u;  // RGBA (0,0,0,255) little-endian
+
+  concurrency::parallel_for(0, out_h, [&](int oy) {
+    uint32_t* row = reinterpret_cast<uint32_t*>(out) + static_cast<size_t>(oy) * out_w;
+    const double sy = (oy + 0.5 - off_y) / scale - 0.5;
+    if (sy < -0.5 || sy > h - 0.5) {
+      std::fill(row, row + out_w, kBlack);
+      return;
+    }
+    const int y0 = std::clamp(static_cast<int>(std::floor(sy)), 0, h - 1);
+    const int y1 = std::min(y0 + 1, h - 1);
+    const int fy = std::clamp(static_cast<int>((sy - y0) * 256.0), 0, 256);
+    const uint8_t* r0 = in + static_cast<size_t>(y0) * w * 4;
+    const uint8_t* r1 = in + static_cast<size_t>(y1) * w * 4;
+    uint8_t* dst = reinterpret_cast<uint8_t*>(row);
+    for (int ox = 0; ox < out_w; ++ox, dst += 4) {
+      const double sx = (ox + 0.5 - off_x) / scale - 0.5;
+      if (sx < -0.5 || sx > w - 0.5) {
+        *reinterpret_cast<uint32_t*>(dst) = kBlack;
+        continue;
+      }
+      const int x0 = std::clamp(static_cast<int>(std::floor(sx)), 0, w - 1);
+      const int x1 = std::min(x0 + 1, w - 1);
+      const int fx = std::clamp(static_cast<int>((sx - x0) * 256.0), 0, 256);
+      for (int c = 0; c < 4; ++c) {
+        const int top = r0[x0 * 4 + c] * (256 - fx) + r0[x1 * 4 + c] * fx;
+        const int bottom = r1[x0 * 4 + c] * (256 - fx) + r1[x1 * 4 + c] * fx;
+        dst[c] = static_cast<uint8_t>((top * (256 - fy) + bottom * fy) >> 16);
+      }
+    }
+  });
+
+  *width = out_w;
+  *height = out_h;
+  return out;
 }
 
 bool Receiver::SaveSnapshot(const std::wstring& path, std::string* error) {

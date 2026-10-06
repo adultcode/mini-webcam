@@ -38,6 +38,8 @@ class Receiver {
   void Disconnect();
   void SetTransform(int rotation, bool mirror);
   void SetPreviewEnabled(bool enabled) { preview_enabled_ = enabled; }
+  // Output aspect ratio (0:0 = keep the camera's). fill=true crops, false pads.
+  void SetAspect(int aspect_w, int aspect_h, bool fill);
   void SetVirtualCameraEnabled(bool enabled) { vcam_.SetEnabled(enabled); }
 
   flutter::EncodableMap Status();
@@ -56,6 +58,7 @@ class Receiver {
   void OnH264(const uint8_t* data, size_t size, int64_t pts, bool keyframe);
   void OnJpeg(const uint8_t* data, size_t size);
   void Present(const uint8_t* rgba, int width, int height);
+  const uint8_t* Reframe(const uint8_t* src, int* width, int* height);
 
   void SetState(const std::string& state, const std::string& message);
   const FlutterDesktopPixelBuffer* CopyPixelBuffer(size_t width, size_t height);
@@ -86,6 +89,10 @@ class Receiver {
   std::vector<uint8_t> au_;
   std::vector<uint8_t> rgba_;
   std::vector<uint8_t> transformed_;
+  std::vector<uint8_t> reframed_;
+  std::atomic<int> aspect_w_{0};
+  std::atomic<int> aspect_h_{0};
+  std::atomic<bool> aspect_fill_{false};
   std::vector<uint8_t> payload_;
   int stream_fps_ = 30;
   std::atomic<int> rotation_{0};

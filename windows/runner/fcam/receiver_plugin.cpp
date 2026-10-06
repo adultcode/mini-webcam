@@ -138,6 +138,10 @@ class ReceiverPlugin : public flutter::Plugin {
       receiver_->SetTransform(IntArg(args, "rotation", 0),
                               BoolArg(args, "mirror", false));
       result->Success();
+    } else if (method == "setAspect") {
+      receiver_->SetAspect(IntArg(args, "width", 0), IntArg(args, "height", 0),
+                           BoolArg(args, "fill", false));
+      result->Success();
     } else if (method == "setPreview") {
       receiver_->SetPreviewEnabled(BoolArg(args, "enabled", true));
       result->Success();

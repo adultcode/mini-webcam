@@ -11,6 +11,9 @@ import '../services/discovery_listener.dart';
 import '../services/phone_api.dart';
 import '../services/receiver_channel.dart';
 import '../services/virtual_cam_installer.dart';
+import 'output_aspect.dart';
+
+export 'output_aspect.dart';
 
 enum ConnectionMode { wifi, usb }
 
@@ -46,6 +49,8 @@ class DesktopProvider extends ChangeNotifier {
 
   int rotation = 0;
   bool mirror = false;
+  OutputAspect aspect = OutputAspect.original;
+  bool aspectFill = false;
   bool preview = true;
   bool vcamEnabled = true;
   List<String> systemCameras = const [];
@@ -66,11 +71,14 @@ class DesktopProvider extends ChangeNotifier {
     mode = ConnectionMode.values[_prefs.getInt('desktop.mode') ?? 0];
     rotation = _prefs.getInt('desktop.rotation') ?? 0;
     mirror = _prefs.getBool('desktop.mirror') ?? false;
+    aspect = OutputAspect.fromName(_prefs.getString('desktop.aspect'));
+    aspectFill = _prefs.getBool('desktop.aspectFill') ?? false;
     vcamEnabled = _prefs.getBool('desktop.vcam') ?? true;
     adb.customPath = _prefs.getString('desktop.adbPath');
 
     textureId = await receiver.textureId();
     await receiver.setTransform(rotation: rotation, mirror: mirror);
+    await _applyAspect();
     await refreshSystemCameras();
 
     await discovery.start();
@@ -277,6 +285,19 @@ class DesktopProvider extends ChangeNotifier {
     await receiver.setTransform(rotation: this.rotation, mirror: this.mirror);
     notifyListeners();
   }
+
+  /// Changes the output shape, e.g. 16:9 from a phone held upright.
+  Future<void> setAspect({OutputAspect? aspect, bool? fill}) async {
+    this.aspect = aspect ?? this.aspect;
+    aspectFill = fill ?? aspectFill;
+    await _prefs.setString('desktop.aspect', this.aspect.name);
+    await _prefs.setBool('desktop.aspectFill', aspectFill);
+    await _applyAspect();
+    notifyListeners();
+  }
+
+  Future<void> _applyAspect() =>
+      receiver.setAspect(width: aspect.width, height: aspect.height, fill: aspectFill);
 
   Future<void> setPreview(bool enabled) async {
     preview = enabled;
