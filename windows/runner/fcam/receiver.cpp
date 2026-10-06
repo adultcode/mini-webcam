@@ -432,6 +432,46 @@ void Receiver::Present(const uint8_t* rgba, int width, int height) {
   }
 }
 
+bool Receiver::SaveSnapshot(const std::wstring& path, std::string* error) {
+  std::vector<uint8_t> pixels;
+  UINT width = 0, height = 0;
+  {
+    std::lock_guard<std::mutex> lock(pixel_mutex_);
+    if (front_.empty()) {
+      *error = "No video frame yet (is the preview on?)";
+      return false;
+    }
+    pixels = front_;
+    width = static_cast<UINT>(front_width_);
+    height = static_cast<UINT>(front_height_);
+  }
+  for (size_t i = 0; i + 3 < pixels.size(); i += 4) std::swap(pixels[i], pixels[i + 2]);
+
+  using Microsoft::WRL::ComPtr;
+  ComPtr<IWICImagingFactory> factory;
+  ComPtr<IWICStream> stream;
+  ComPtr<IWICBitmapEncoder> encoder;
+  ComPtr<IWICBitmapFrameEncode> frame;
+  WICPixelFormatGUID format = GUID_WICPixelFormat32bppBGRA;
+  const UINT stride = width * 4;
+  bool ok =
+      SUCCEEDED(CoCreateInstance(CLSID_WICImagingFactory, nullptr,
+                                 CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory))) &&
+      SUCCEEDED(factory->CreateStream(&stream)) &&
+      SUCCEEDED(stream->InitializeFromFilename(path.c_str(), GENERIC_WRITE)) &&
+      SUCCEEDED(factory->CreateEncoder(GUID_ContainerFormatPng, nullptr, &encoder)) &&
+      SUCCEEDED(encoder->Initialize(stream.Get(), WICBitmapEncoderNoCache)) &&
+      SUCCEEDED(encoder->CreateNewFrame(&frame, nullptr)) &&
+      SUCCEEDED(frame->Initialize(nullptr)) &&
+      SUCCEEDED(frame->SetSize(width, height)) &&
+      SUCCEEDED(frame->SetPixelFormat(&format)) &&
+      IsEqualGUID(format, GUID_WICPixelFormat32bppBGRA) &&
+      SUCCEEDED(frame->WritePixels(height, stride, stride * height, pixels.data())) &&
+      SUCCEEDED(frame->Commit()) && SUCCEEDED(encoder->Commit());
+  if (!ok) *error = "Could not write the PNG file";
+  return ok;
+}
+
 // Raster thread. The mutex stays locked until Flutter has uploaded the pixels.
 const FlutterDesktopPixelBuffer* Receiver::CopyPixelBuffer(size_t, size_t) {
   pixel_mutex_.lock();

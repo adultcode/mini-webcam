@@ -5,7 +5,9 @@ import 'package:provider/provider.dart';
 
 import 'core/theme/app_theme.dart';
 import 'desktop/providers/desktop_provider.dart';
+import 'desktop/providers/studio_view_provider.dart';
 import 'desktop/ui/screens/desktop_home_screen.dart';
+import 'desktop/ui/theme/studio_theme.dart';
 import 'phone/providers/blackout_provider.dart';
 import 'phone/providers/phone_provider.dart';
 import 'phone/ui/screens/phone_home_screen.dart';
@@ -21,7 +23,7 @@ class MiniWebcamApp extends StatelessWidget {
     final app = MaterialApp(
       title: 'Mini Webcam',
       debugShowCheckedModeBanner: false,
-      theme: buildAppTheme(),
+      theme: Platform.isAndroid ? buildAppTheme() : buildStudioTheme(),
       home: Platform.isAndroid ? const PhoneHomeScreen() : const DesktopHomeScreen(),
     );
     return Platform.isAndroid ? _phoneProviders(app) : _desktopProviders(app);
@@ -38,8 +40,11 @@ class MiniWebcamApp extends StatelessWidget {
         child: child,
       );
 
-  Widget _desktopProviders(Widget child) => ChangeNotifierProvider(
-        create: (_) => DesktopProvider()..start(args),
+  Widget _desktopProviders(Widget child) => MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => DesktopProvider()..start(args)),
+          ChangeNotifierProvider(create: (_) => StudioViewProvider()),
+        ],
         child: child,
       );
 }

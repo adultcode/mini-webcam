@@ -31,6 +31,16 @@ std::string Narrow(const std::wstring& wide) {
   return out;
 }
 
+std::wstring Widen(const std::string& utf8) {
+  if (utf8.empty()) return {};
+  int size = MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(),
+                                 static_cast<int>(utf8.size()), nullptr, 0);
+  std::wstring out(static_cast<size_t>(size), L'\0');
+  MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), static_cast<int>(utf8.size()),
+                      out.data(), size);
+  return out;
+}
+
 // Names of the DirectShow video capture devices other apps can see.
 EncodableList ListVideoDevices() {
   EncodableList names;
@@ -134,6 +144,16 @@ class ReceiverPlugin : public flutter::Plugin {
     } else if (method == "setVirtualCamera") {
       receiver_->SetVirtualCameraEnabled(BoolArg(args, "enabled", false));
       result->Success();
+    } else if (method == "snapshot") {
+      const std::string path = StringArg(args, "path");
+      std::string error;
+      if (path.empty()) {
+        result->Error("bad_args", "path is required");
+      } else if (receiver_->SaveSnapshot(Widen(path), &error)) {
+        result->Success();
+      } else {
+        result->Error("snapshot_failed", error);
+      }
     } else if (method == "listCameras") {
       result->Success(EncodableValue(ListVideoDevices()));
     } else {

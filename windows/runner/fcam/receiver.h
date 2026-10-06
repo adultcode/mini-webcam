@@ -42,6 +42,9 @@ class Receiver {
 
   flutter::EncodableMap Status();
 
+  // Saves the latest preview frame (after rotation/mirror) as a PNG.
+  bool SaveSnapshot(const std::wstring& path, std::string* error);
+
  private:
   void Run(std::string host, int port);
   bool StreamSession(SOCKET s);

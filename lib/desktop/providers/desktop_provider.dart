@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/protocol.dart';
@@ -30,6 +32,7 @@ class DesktopProvider extends ChangeNotifier {
   ConnectionMode mode = ConnectionMode.wifi;
   String lastHost = '';
   String? target; // what we're connected (or connecting) to, for display
+  ConnectionMode? connectedVia;
   bool active = false;
   String? error;
 
@@ -113,6 +116,7 @@ class DesktopProvider extends ChangeNotifier {
     await disconnect();
     lastHost = host;
     await _prefs.setString('desktop.host', host);
+    connectedVia = ConnectionMode.wifi;
     await _start(host, FcamPorts.streamPort, host, FcamPorts.controlPort, host);
   }
 
@@ -133,6 +137,7 @@ class DesktopProvider extends ChangeNotifier {
         }
       }
       api.close();
+      connectedVia = ConnectionMode.usb;
       await _start(local, FcamPorts.usbStreamPort, local, FcamPorts.usbControlPort,
           '${device.model} (USB)');
     } catch (e) {
@@ -177,6 +182,7 @@ class DesktopProvider extends ChangeNotifier {
     phone = null;
     active = false;
     target = null;
+    connectedVia = null;
     await receiver.disconnect();
     notifyListeners();
   }
@@ -191,6 +197,26 @@ class DesktopProvider extends ChangeNotifier {
       error = 'Phone rejected change: $e';
     }
     notifyListeners();
+  }
+
+  /// Puts zoom, exposure and focus back to their defaults.
+  Future<void> resetOptics() =>
+      updatePhone({'zoom': 1.0, 'exposure': 0, 'focusMode': 'auto', 'focusDistance': 0.0});
+
+  // --- snapshot -------------------------------------------------------------
+
+  /// Saves the current preview frame to Pictures\Mini Webcam and returns its path.
+  Future<String> takeSnapshot() async {
+    final home = Platform.environment['USERPROFILE'] ?? Directory.systemTemp.path;
+    final dir = Directory(p.join(home, 'Pictures', 'Mini Webcam'));
+    await dir.create(recursive: true);
+    final now = DateTime.now();
+    String two(int v) => v.toString().padLeft(2, '0');
+    final name = 'mini-webcam-${now.year}${two(now.month)}${two(now.day)}-'
+        '${two(now.hour)}${two(now.minute)}${two(now.second)}.png';
+    final path = p.join(dir.path, name);
+    await receiver.snapshot(path);
+    return path;
   }
 
   Future<void> _pollPhone() async {
@@ -282,7 +308,6 @@ class DesktopProvider extends ChangeNotifier {
     notifyListeners();
     try {
       if (uninstall) {
-        await setVirtualCamera(false);
         await VirtualCamInstaller.uninstall();
       } else {
         await VirtualCamInstaller.install();

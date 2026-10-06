@@ -27,6 +27,9 @@ class ReceiverChannel {
   Future<void> setVirtualCamera(bool enabled) =>
       _channel.invokeMethod('setVirtualCamera', {'enabled': enabled});
 
+  /// Saves the current preview frame as a PNG at [path].
+  Future<void> snapshot(String path) => _channel.invokeMethod('snapshot', {'path': path});
+
   /// DirectShow video devices visible to other apps (Zoom, Teams, OBS...).
   Future<List<String>> listCameras() async =>
       (await _channel.invokeListMethod<String>('listCameras')) ?? const [];
