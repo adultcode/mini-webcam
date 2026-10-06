@@ -20,6 +20,12 @@ class CameraChannel {
     return r?['name'] as String? ?? 'Android phone';
   }
 
+  /// Returns "granted", "denied" or "permanentlyDenied".
+  Future<String> requestPermission() async =>
+      await _channel.invokeMethod<String>('requestPermission') ?? 'denied';
+
+  Future<void> openAppSettings() => _channel.invokeMethod('openAppSettings');
+
   Future<void> open() => _channel.invokeMethod('open');
   Future<void> close() => _channel.invokeMethod('close');
 

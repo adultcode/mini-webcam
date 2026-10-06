@@ -1,25 +1,90 @@
 package com.adultcode.miniwebcam
 
+import android.Manifest
 import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import com.adultcode.miniwebcam.camera.CameraEngine
 import com.adultcode.miniwebcam.stream.StreamHub
 import io.flutter.embedding.engine.plugins.FlutterPlugin
+import io.flutter.embedding.engine.plugins.activity.ActivityAware
+import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import io.flutter.plugin.common.PluginRegistry
 
 /**
  * Bridges Dart (UI + control HTTP server) to the native capture/encode/stream pipeline.
  * Only small control messages cross this channel; video frames stay native.
  */
-class CameraPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
+class CameraPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware,
+    PluginRegistry.RequestPermissionsResultListener {
     private lateinit var channel: MethodChannel
     private lateinit var context: Context
     private lateinit var binding: FlutterPlugin.FlutterPluginBinding
     private val main = Handler(Looper.getMainLooper())
+    private var activityBinding: ActivityPluginBinding? = null
+    private var pendingPermission: MethodChannel.Result? = null
+
+    // --- camera permission (no third-party plugin needed) -----------------------------
+
+    override fun onAttachedToActivity(binding: ActivityPluginBinding) {
+        activityBinding = binding
+        binding.addRequestPermissionsResultListener(this)
+    }
+
+    override fun onDetachedFromActivity() {
+        activityBinding?.removeRequestPermissionsResultListener(this)
+        activityBinding = null
+    }
+
+    override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) =
+        onAttachedToActivity(binding)
+
+    override fun onDetachedFromActivityForConfigChanges() = onDetachedFromActivity()
+
+    /** Replies "granted", "denied" or "permanentlyDenied". */
+    private fun requestCameraPermission(result: MethodChannel.Result) {
+        val activity = activityBinding?.activity
+        if (context.checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            result.success("granted")
+            return
+        }
+        if (activity == null || pendingPermission != null) {
+            result.success("denied")
+            return
+        }
+        pendingPermission = result
+        activity.requestPermissions(arrayOf(Manifest.permission.CAMERA), PERMISSION_REQUEST)
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray,
+    ): Boolean {
+        if (requestCode != PERMISSION_REQUEST) return false
+        val result = pendingPermission ?: return true
+        pendingPermission = null
+        val granted = grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED
+        val activity = activityBinding?.activity
+        result.success(
+            when {
+                granted -> "granted"
+                // No rationale after a denial means "don't ask again" was chosen.
+                activity != null && !activity.shouldShowRequestPermissionRationale(Manifest.permission.CAMERA) ->
+                    "permanentlyDenied"
+                else -> "denied"
+            }
+        )
+        return true
+    }
 
     private val hub = StreamHub()
     private var engine: CameraEngine? = null
@@ -53,6 +118,18 @@ class CameraPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         }
         if (call.method == "deviceInfo") {
             result.success(mapOf("name" to "${Build.MANUFACTURER} ${Build.MODEL}", "sdk" to Build.VERSION.SDK_INT))
+            return
+        }
+        if (call.method == "requestPermission") {
+            requestCameraPermission(result)
+            return
+        }
+        if (call.method == "openAppSettings") {
+            context.startActivity(
+                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+            result.success(null)
             return
         }
 
@@ -115,6 +192,7 @@ class CameraPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     }
 
     private companion object {
+        const val PERMISSION_REQUEST = 4711
         val NOT_IMPLEMENTED = Any()
     }
 }

@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
@@ -38,6 +37,7 @@ class PhoneController extends ChangeNotifier {
   int? textureId;
   bool handlesRotation = false;
   bool permissionDenied = false;
+  bool _permanentlyDenied = false;
   String? error;
   String deviceName = 'Android phone';
   CameraSettings settings = const CameraSettings();
@@ -54,9 +54,10 @@ class PhoneController extends ChangeNotifier {
   String get cameraState => _stats['state'] as String? ?? 'idle';
 
   Future<void> init() async {
-    final status = await Permission.camera.request();
-    if (!status.isGranted) {
+    final status = await _camera.requestPermission();
+    if (status != 'granted') {
       permissionDenied = true;
+      _permanentlyDenied = status == 'permanentlyDenied';
       notifyListeners();
       return;
     }
@@ -88,8 +89,9 @@ class PhoneController extends ChangeNotifier {
   }
 
   Future<void> retryPermission() async {
-    if (await Permission.camera.isPermanentlyDenied) {
-      await openAppSettings();
+    if (_permanentlyDenied) {
+      // Android won't show the dialog again; the user has to allow it in Settings.
+      await _camera.openAppSettings();
     } else {
       await init();
     }
