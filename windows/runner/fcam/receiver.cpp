@@ -253,6 +253,12 @@ SOCKET Receiver::OpenSocket(const std::string& host, int port,
   DWORD recv_timeout = 5000;  // The phone always sends at least ~10 fps.
   setsockopt(s, SOL_SOCKET, SO_RCVTIMEO,
              reinterpret_cast<const char*>(&recv_timeout), sizeof(recv_timeout));
+  BOOL keep_alive = TRUE;
+  setsockopt(s, SOL_SOCKET, SO_KEEPALIVE,
+             reinterpret_cast<const char*>(&keep_alive), sizeof(keep_alive));
+  BOOL no_delay = TRUE;
+  setsockopt(s, IPPROTO_TCP, TCP_NODELAY,
+             reinterpret_cast<const char*>(&no_delay), sizeof(no_delay));
   int recv_buffer = 4 * 1024 * 1024;
   setsockopt(s, SOL_SOCKET, SO_RCVBUF,
              reinterpret_cast<const char*>(&recv_buffer), sizeof(recv_buffer));

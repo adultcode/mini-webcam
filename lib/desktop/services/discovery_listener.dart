@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import '../../core/lan.dart';
 import '../../core/protocol.dart';
 
 class DiscoveredPhone {
@@ -62,11 +63,9 @@ class DiscoveryListener {
   }
 
   void _tick() {
-    try {
-      _socket?.send(utf8.encode(FcamDiscovery.probe),
-          InternetAddress('255.255.255.255'), FcamPorts.discoveryPort);
-    } on SocketException {
-      // No network right now.
+    // Per-interface so a VPN default route cannot swallow the probe.
+    if (_socket != null) {
+      broadcastOnAllInterfaces(utf8.encode(FcamDiscovery.probe), FcamPorts.discoveryPort);
     }
     final cutoff = DateTime.now().subtract(const Duration(seconds: 8));
     final before = _phones.length;

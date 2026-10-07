@@ -124,6 +124,7 @@ class StreamHub {
             }
             try {
                 socket.tcpNoDelay = true
+                socket.keepAlive = true
                 socket.sendBufferSize = 512 * 1024
                 handler(socket)
             } catch (e: Exception) {

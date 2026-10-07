@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import '../../core/lan.dart';
 import '../../core/protocol.dart';
 
 /// Announces the phone on the LAN so the desktop can list it without typing an IP.
@@ -28,7 +29,8 @@ class DiscoveryBeacon {
         if (d == null) return;
         if (utf8.decode(d.data, allowMalformed: true) == FcamDiscovery.probe) {
           try {
-            socket.send(_message(), d.address, d.port);
+            // Reply to the discovery port, not d.port: probes come from short-lived sockets.
+            socket.send(_message(), d.address, FcamPorts.discoveryPort);
           } on SocketException {
             // Network blocked (e.g. phone asleep); the next probe gets an answer.
           }
@@ -43,12 +45,9 @@ class DiscoveryBeacon {
   }
 
   void _broadcast() {
-    try {
-      _socket?.send(
-          _message(), InternetAddress('255.255.255.255'), FcamPorts.discoveryPort);
-    } on SocketException {
-      // Network down / no Wi-Fi; try again on the next tick.
-    }
+    if (_socket == null) return;
+    // Per-interface so a VPN default route cannot swallow the broadcast.
+    broadcastOnAllInterfaces(_message(), FcamPorts.discoveryPort);
   }
 
   List<int> _message() => utf8.encode(jsonEncode({

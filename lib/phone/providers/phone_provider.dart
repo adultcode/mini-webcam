@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
+import '../../core/lan.dart';
 import '../../core/models/camera_models.dart';
 import '../../core/protocol.dart';
 import '../services/camera_channel.dart';
@@ -50,7 +51,8 @@ class PhoneProvider extends ChangeNotifier {
   CameraFeatures features = const CameraFeatures();
   bool streaming = false;
   Map<String, dynamic> _stats = const {};
-  List<String> addresses = const [];
+  List<LanAddress> addresses = const [];
+  int _pollCount = 0;
   Timer? _statsTimer;
 
   int get viewers => fcamClients + mjpegClients;
@@ -152,6 +154,8 @@ class PhoneProvider extends ChangeNotifier {
   }
 
   Future<void> _poll() async {
+    // Wi-Fi/VPN can change while the app is open.
+    if (++_pollCount % 5 == 0) await _refreshAddresses();
     try {
       _stats = await _camera.stats();
       final nativeError = _stats['error'] as String?;
@@ -164,16 +168,7 @@ class PhoneProvider extends ChangeNotifier {
   }
 
   Future<void> _refreshAddresses() async {
-    try {
-      final interfaces = await NetworkInterface.list(type: InternetAddressType.IPv4);
-      addresses = [
-        for (final i in interfaces)
-          for (final a in i.addresses)
-            if (!a.isLoopback) a.address,
-      ];
-    } catch (_) {
-      addresses = const [];
-    }
+    addresses = await lanAddresses();
   }
 
   Map<String, dynamic> _info() => {

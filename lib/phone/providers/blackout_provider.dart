@@ -10,7 +10,7 @@ class BlackoutProvider extends ChangeNotifier {
   static const delay = Duration(seconds: 30);
 
   bool _active = false;
-  bool _auto = true;
+  bool _auto = false;
   bool _streaming = false;
   Timer? _timer;
 

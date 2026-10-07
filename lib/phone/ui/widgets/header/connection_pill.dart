@@ -12,7 +12,11 @@ class ConnectionPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final phone = context.watch<PhoneProvider>();
-    final address = phone.addresses.isEmpty ? 'USB only' : phone.addresses.first;
+    final lan = phone.addresses.where((a) => !a.isVpn).toList();
+    final hasVpn = phone.addresses.any((a) => a.isVpn);
+    final address = lan.isNotEmpty
+        ? lan.first.address
+        : (phone.addresses.isEmpty ? 'USB only' : 'VPN only · ${phone.addresses.first.address}');
     final sending = phone.streaming && phone.viewers > 0;
 
     return GlassContainer(
@@ -29,12 +33,22 @@ class ConnectionPill extends StatelessWidget {
         const SizedBox(width: 8),
         Expanded(
           // The PC needs this address for Wi-Fi; resolution is shown by the quality chips.
-          child: Text(address,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  fontFamily: OledText.mono, fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(address,
+                maxLines: 1,
+                style: const TextStyle(
+                    fontFamily: OledText.mono, fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
+          ),
         ),
+        if (hasVpn) ...[
+          const SizedBox(width: 6),
+          Tooltip(
+            message: 'VPN active: allow local network access in the VPN app or turn it off for Wi-Fi',
+            child: Text('VPN', style: OledText.chip.copyWith(color: Colors.amber)),
+          ),
+        ],
         const SizedBox(width: 6),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),

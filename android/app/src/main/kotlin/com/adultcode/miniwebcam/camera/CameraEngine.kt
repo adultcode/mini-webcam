@@ -14,8 +14,10 @@ import android.hardware.camera2.CaptureRequest
 import android.hardware.camera2.params.MeteringRectangle
 import android.media.MediaCodec
 import android.os.Build
+import android.net.wifi.WifiManager
 import android.os.Handler
 import android.os.HandlerThread
+import android.os.PowerManager
 import android.util.Log
 import android.util.Range
 import android.util.Size
@@ -42,6 +44,9 @@ class CameraEngine(
     private val hub: StreamHub,
     private val producer: TextureRegistry.SurfaceProducer,
 ) {
+    private val appContext = context.applicationContext
+    private var wifiLock: WifiManager.WifiLock? = null
+    private var wakeLock: PowerManager.WakeLock? = null
     private val manager = context.getSystemService(CameraManager::class.java)
     private val cameraThread = HandlerThread("miniwebcam-camera").apply { start() }
     private val encoderThread = HandlerThread("miniwebcam-encoder").apply { start() }
@@ -104,6 +109,7 @@ class CameraEngine(
 
     fun close() {
         active = false
+        setNetworkLocks(false)
         closeCamera()
         state = "idle"
     }
@@ -112,7 +118,36 @@ class CameraEngine(
         if (enabled == streaming) return
         streaming = enabled
         if (enabled) hub.start() else hub.stop()
+        setNetworkLocks(enabled)
         if (active) restart()
+    }
+
+    /**
+     * Keeps the Wi-Fi radio out of power-save while streaming. Without these Android
+     * batches packets and drops the link, which shows up as lag and reconnects.
+     */
+    @SuppressLint("WakelockTimeout")
+    private fun setNetworkLocks(held: Boolean) {
+        runCatching {
+            if (held) {
+                if (wifiLock == null) {
+                    val mode = if (Build.VERSION.SDK_INT >= 29) WifiManager.WIFI_MODE_FULL_LOW_LATENCY
+                    else WifiManager.WIFI_MODE_FULL_HIGH_PERF
+                    wifiLock = appContext.getSystemService(WifiManager::class.java)
+                        ?.createWifiLock(mode, "miniwebcam:stream")?.apply { setReferenceCounted(false) }
+                }
+                if (wakeLock == null) {
+                    wakeLock = appContext.getSystemService(PowerManager::class.java)
+                        ?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "miniwebcam:stream")
+                        ?.apply { setReferenceCounted(false) }
+                }
+                wifiLock?.takeIf { !it.isHeld }?.acquire()
+                wakeLock?.takeIf { !it.isHeld }?.acquire()
+            } else {
+                wifiLock?.takeIf { it.isHeld }?.release()
+                wakeLock?.takeIf { it.isHeld }?.release()
+            }
+        }
     }
 
     fun update(map: Map<*, *>) {
