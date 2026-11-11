@@ -16,6 +16,7 @@
 #include <thread>
 #include <vector>
 
+#include "fcam/background_effect.h"
 #include "fcam/decoders.h"
 #include "fcam/virtual_camera.h"
 
@@ -41,6 +42,14 @@ class Receiver {
   // Output aspect ratio (0:0 = keep the camera's). fill=true crops, false pads.
   void SetAspect(int aspect_w, int aspect_h, bool fill);
   void SetVirtualCameraEnabled(bool enabled) { vcam_.SetEnabled(enabled); }
+  // Background blur / replacement, applied before the preview and the
+  // virtual camera.
+  void SetBackground(BackgroundEffect::Mode mode, int strength) {
+    background_.SetMode(mode, strength);
+  }
+  bool SetBackgroundImage(const std::wstring& path, std::string* error) {
+    return background_.SetImage(path, error);
+  }
 
   flutter::EncodableMap Status();
 
@@ -99,6 +108,7 @@ class Receiver {
   std::atomic<bool> mirror_{false};
   std::atomic<bool> preview_enabled_{true};
 
+  BackgroundEffect background_;
   VirtualCamera vcam_;
 
   // Status shared with the platform thread.

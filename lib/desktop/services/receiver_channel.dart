@@ -31,6 +31,19 @@ class ReceiverChannel {
   Future<void> setVirtualCamera(bool enabled) =>
       _channel.invokeMethod('setVirtualCamera', {'enabled': enabled});
 
+  /// Background effect: [mode] 0 = off, 1 = blur, 2 = image. [strength] is
+  /// the blur amount (0-100). [imagePath] is loaded only when it changes;
+  /// pass null to leave the current image alone.
+  Future<void> setBackground({required int mode, required int strength, String? imagePath}) =>
+      _channel.invokeMethod('setBackground', {
+        'mode': mode,
+        'strength': strength,
+        'image': ?imagePath,
+      });
+
+  /// Opens the Windows file picker for a background picture. Null if cancelled.
+  Future<String?> pickBackgroundImage() => _channel.invokeMethod<String>('pickBackgroundImage');
+
   /// Saves the current preview frame as a PNG at [path].
   Future<void> snapshot(String path) => _channel.invokeMethod('snapshot', {'path': path});
 
@@ -57,6 +70,9 @@ class ReceiverStatus {
   bool get vcamActive => _m['vcamActive'] as bool? ?? false;
   bool get vcamAppConnected => _m['vcamAppConnected'] as bool? ?? false;
   String get vcamError => _m['vcamError'] as String? ?? '';
+  bool get bgActive => _m['bgActive'] as bool? ?? false;
+  double get bgMs => (_m['bgMs'] as num?)?.toDouble() ?? 0;
+  String get bgError => _m['bgError'] as String? ?? '';
 
   bool get isStreaming => state == 'streaming';
   bool get isIdle => state == 'idle';

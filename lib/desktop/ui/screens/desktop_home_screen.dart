@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../providers/desktop_provider.dart';
+import '../widgets/device/background_card.dart';
 import '../widgets/device/phone_device_card.dart';
 import '../widgets/device/transform_card.dart';
 import '../widgets/device/virtual_driver_card.dart';
@@ -45,6 +46,7 @@ class DesktopHomeScreen extends StatelessWidget {
                     const PhoneDeviceCard(),
                     const VirtualDriverCard(),
                     const TransformCard(),
+                    const BackgroundCard(),
                     const ErrorBanner(),
                     // Narrow window: tuner moves under the left column.
                     if (!showTuner) ...tuner,

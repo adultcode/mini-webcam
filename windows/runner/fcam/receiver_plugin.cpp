@@ -4,10 +4,12 @@
 #include "fcam/receiver_plugin.h"
 
 #include <dshow.h>
+#include <shobjidl.h>
 #include <flutter/method_channel.h>
 #include <flutter/plugin_registrar_windows.h>
 #include <flutter/standard_method_codec.h>
 
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <vector>
@@ -99,10 +101,40 @@ std::string StringArg(const EncodableMap* args, const char* key) {
   return {};
 }
 
+// Shows the standard "Open" dialog for a picture. Empty when cancelled.
+std::wstring PickImageFile(HWND owner) {
+  Microsoft::WRL::ComPtr<IFileOpenDialog> dialog;
+  if (FAILED(CoCreateInstance(CLSID_FileOpenDialog, nullptr,
+                              CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&dialog)))) {
+    return {};
+  }
+  const COMDLG_FILTERSPEC filters[] = {
+      {L"Images", L"*.jpg;*.jpeg;*.png;*.bmp;*.gif;*.tif;*.tiff;*.webp;*.heic"},
+      {L"All files", L"*.*"},
+  };
+  dialog->SetFileTypes(2, filters);
+  dialog->SetTitle(L"Choose a background image");
+  DWORD options = 0;
+  dialog->GetOptions(&options);
+  dialog->SetOptions(options | FOS_FILEMUSTEXIST | FOS_FORCEFILESYSTEM);
+  if (FAILED(dialog->Show(owner))) return {};
+
+  Microsoft::WRL::ComPtr<IShellItem> item;
+  PWSTR path = nullptr;
+  std::wstring result;
+  if (SUCCEEDED(dialog->GetResult(&item)) &&
+      SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &path))) {
+    result = path;
+    CoTaskMemFree(path);
+  }
+  return result;
+}
+
 class ReceiverPlugin : public flutter::Plugin {
  public:
   explicit ReceiverPlugin(flutter::PluginRegistrarWindows* registrar)
-      : receiver_(std::make_unique<Receiver>(registrar->texture_registrar())) {
+      : registrar_(registrar),
+        receiver_(std::make_unique<Receiver>(registrar->texture_registrar())) {
     channel_ = std::make_unique<flutter::MethodChannel<EncodableValue>>(
         registrar->messenger(), "miniwebcam/receiver",
         &flutter::StandardMethodCodec::GetInstance());
@@ -148,6 +180,30 @@ class ReceiverPlugin : public flutter::Plugin {
     } else if (method == "setVirtualCamera") {
       receiver_->SetVirtualCameraEnabled(BoolArg(args, "enabled", false));
       result->Success();
+    } else if (method == "setBackground") {
+      const int mode = std::clamp(IntArg(args, "mode", 0), 0, 2);
+      if (Arg(args, "image")) {
+        const std::string image = StringArg(args, "image");
+        if (image != background_image_) {
+          std::string error;
+          if (!receiver_->SetBackgroundImage(Widen(image), &error)) {
+            result->Error("image_failed", error);
+            return;
+          }
+          background_image_ = image;
+        }
+      }
+      receiver_->SetBackground(static_cast<BackgroundEffect::Mode>(mode),
+                               IntArg(args, "strength", 60));
+      result->Success();
+    } else if (method == "pickBackgroundImage") {
+      HWND owner = nullptr;
+      if (registrar_->GetView()) {
+        owner = GetAncestor(registrar_->GetView()->GetNativeWindow(), GA_ROOT);
+      }
+      const std::wstring path = PickImageFile(owner);
+      result->Success(path.empty() ? EncodableValue()
+                                   : EncodableValue(Narrow(path)));
     } else if (method == "snapshot") {
       const std::string path = StringArg(args, "path");
       std::string error;
@@ -165,7 +221,9 @@ class ReceiverPlugin : public flutter::Plugin {
     }
   }
 
+  flutter::PluginRegistrarWindows* registrar_;
   std::unique_ptr<Receiver> receiver_;
+  std::string background_image_;
   std::unique_ptr<flutter::MethodChannel<EncodableValue>> channel_;
 };
 

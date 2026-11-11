@@ -13,6 +13,7 @@ set(PLUGIN_REGISTRAR_SOURCE
 set_source_files_properties("${PLUGIN_REGISTRAR_SOURCE}" PROPERTIES GENERATED TRUE)
 
 add_executable(${BINARY_NAME} WIN32
+  "fcam/background_effect.cpp"
   "fcam/decoders.cpp"
   "fcam/receiver.cpp"
   "fcam/receiver_plugin.cpp"
@@ -52,6 +53,10 @@ target_link_libraries(${BINARY_NAME} PRIVATE
   "windowscodecs.lib" "strmiids.lib" "ole32.lib" "oleaut32.lib")
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+# onnxruntime_c_api.h, fetched by third_party/segmentation/fetch_segmentation.ps1.
+# onnxruntime.dll itself is loaded at runtime, so there is no import library.
+target_include_directories(${BINARY_NAME} PRIVATE
+  "${CMAKE_SOURCE_DIR}/third_party/segmentation")
 
 # Run the Flutter tool portions of the build. This must not be removed.
 add_dependencies(${BINARY_NAME} flutter_assemble)

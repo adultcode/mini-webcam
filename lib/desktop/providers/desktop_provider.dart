@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -11,8 +12,10 @@ import '../services/discovery_listener.dart';
 import '../services/phone_api.dart';
 import '../services/receiver_channel.dart';
 import '../services/virtual_cam_installer.dart';
+import 'background_mode.dart';
 import 'output_aspect.dart';
 
+export 'background_mode.dart';
 export 'output_aspect.dart';
 
 enum ConnectionMode { wifi, usb }
@@ -52,6 +55,9 @@ class DesktopProvider extends ChangeNotifier {
   OutputAspect aspect = OutputAspect.original;
   bool aspectFill = false;
   bool preview = true;
+  BackgroundMode background = BackgroundMode.off;
+  int blurStrength = 60;
+  String backgroundImage = '';
   bool vcamEnabled = true;
   List<String> systemCameras = const [];
   bool driverBusy = false;
@@ -74,11 +80,19 @@ class DesktopProvider extends ChangeNotifier {
     aspect = OutputAspect.fromName(_prefs.getString('desktop.aspect'));
     aspectFill = _prefs.getBool('desktop.aspectFill') ?? false;
     vcamEnabled = _prefs.getBool('desktop.vcam') ?? true;
+    background = BackgroundMode.fromName(_prefs.getString('desktop.background'));
+    blurStrength = _prefs.getInt('desktop.blurStrength') ?? 60;
+    backgroundImage = _prefs.getString('desktop.backgroundImage') ?? '';
     adb.customPath = _prefs.getString('desktop.adbPath');
 
     textureId = await receiver.textureId();
     await receiver.setTransform(rotation: rotation, mirror: mirror);
     await _applyAspect();
+    if (!await _applyBackground(loadImage: true) && background == BackgroundMode.image) {
+      // Saved picture is gone: start without the effect rather than fail.
+      background = BackgroundMode.off;
+      await _applyBackground();
+    }
     await refreshSystemCameras();
 
     await discovery.start();
@@ -298,6 +312,63 @@ class DesktopProvider extends ChangeNotifier {
 
   Future<void> _applyAspect() =>
       receiver.setAspect(width: aspect.width, height: aspect.height, fill: aspectFill);
+
+  /// Switches the background effect. Choosing [BackgroundMode.image] without
+  /// a saved picture opens the file picker first.
+  Future<void> setBackgroundMode(BackgroundMode mode) async {
+    if (mode == BackgroundMode.image && backgroundImage.isEmpty) {
+      await pickBackgroundImage();
+      return;
+    }
+    background = mode;
+    await _prefs.setString('desktop.background', mode.name);
+    await _applyBackground();
+    notifyListeners();
+  }
+
+  Future<void> setBlurStrength(int strength) async {
+    blurStrength = strength.clamp(0, 100);
+    await _prefs.setInt('desktop.blurStrength', blurStrength);
+    await _applyBackground();
+    notifyListeners();
+  }
+
+  /// Lets the user choose a background picture and switches to it.
+  Future<void> pickBackgroundImage() async {
+    final path = await receiver.pickBackgroundImage();
+    if (path == null) return;
+    final previousImage = backgroundImage;
+    final previousMode = background;
+    backgroundImage = path;
+    background = BackgroundMode.image;
+    if (await _applyBackground(loadImage: true)) {
+      error = null;
+      await _prefs.setString('desktop.backgroundImage', path);
+      await _prefs.setString('desktop.background', background.name);
+    } else {
+      // The receiver kept the previous picture; restore the previous mode too.
+      backgroundImage = previousImage;
+      background = previousMode;
+      await _applyBackground();
+    }
+    notifyListeners();
+  }
+
+  /// Sends the background settings to the receiver. Returns false (and sets
+  /// [error]) when the picture cannot be loaded.
+  Future<bool> _applyBackground({bool loadImage = false}) async {
+    try {
+      await receiver.setBackground(
+        mode: background.index,
+        strength: blurStrength,
+        imagePath: loadImage ? backgroundImage : null,
+      );
+      return true;
+    } on PlatformException catch (e) {
+      error = 'Background image: ${e.message ?? e.code}';
+      return false;
+    }
+  }
 
   Future<void> setPreview(bool enabled) async {
     preview = enabled;

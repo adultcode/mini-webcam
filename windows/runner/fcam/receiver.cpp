@@ -147,6 +147,9 @@ flutter::EncodableMap Receiver::Status() {
   map[EncodableValue("vcamAppConnected")] =
       EncodableValue(vcam_.app_connected());
   map[EncodableValue("vcamError")] = EncodableValue(vcam_.error());
+  map[EncodableValue("bgActive")] = EncodableValue(background_.active());
+  map[EncodableValue("bgMs")] = EncodableValue(background_.TakeAverageMs());
+  map[EncodableValue("bgError")] = EncodableValue(background_.error());
   return map;
 }
 
@@ -420,6 +423,7 @@ void Receiver::Present(const uint8_t* rgba, int width, int height) {
   }
 
   src = Reframe(src, &w, &h);
+  src = background_.Apply(src, w, h);
 
   ++frames_;
   {

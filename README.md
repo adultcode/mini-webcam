@@ -46,6 +46,7 @@ Command line: `mini-webcam.exe --usb` or `mini-webcam.exe --connect=192.168.1.20
 - Automatic phone discovery on the LAN (UDP). In USB mode, ports are forwarded and the phone app is opened for you.
 - Change settings from the phone or the PC: camera, resolution, fps, codec, bitrate, zoom, torch, exposure and manual focus.
 - Rotate (0/90/180/270) or mirror the picture on the PC, change the output aspect (16:9, 4:3, 1:1; fit with bars or fill by cropping) so an upright phone still gives a landscape webcam, show a rule-of-thirds grid, and save snapshots (PNG, to Pictures\Mini Webcam).
+- Background blur or replacement on the PC. MediaPipe selfie segmentation runs with ONNX Runtime on the CPU (about 10 ms per 1080p frame). The effect is applied before the preview and the virtual camera, so every app gets the processed picture.
 - MJPEG mode for browsers, OBS and VLC: `http://<phone-ip>:8081/video`.
 - On the phone: tap to focus, pinch to zoom, and the screen blacks out while streaming to save battery.
 
@@ -85,10 +86,12 @@ android/app/src/main/kotlin/com/adultcode/miniwebcam/
 windows/runner/fcam/
   receiver.cpp                 socket, FCAM parser, transform, texture
   decoders.cpp                 Media Foundation H.264, WIC JPEG, NV12 to RGBA
+  background_effect.cpp        person segmentation (ONNX Runtime), blur and image replacement
   virtual_camera.cpp           softcam.dll loader and sender thread
   receiver_plugin.cpp          method channel "miniwebcam/receiver"
 windows/packaging/             portable exe manifest and self-extractor config
 windows/third_party/softcam/   build_softcam.ps1: builds the camera DLL from tshino/softcam (MIT)
+windows/third_party/segmentation/  fetch_segmentation.ps1: downloads ONNX Runtime and the segmentation models (pinned by SHA-256)
 ```
 
 ## Building
@@ -125,6 +128,7 @@ Required repository secrets: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWO
 
 - [Android-Webcam-Project](https://github.com/soubhagyajit/Android-Webcam-Project), the original idea and design
 - [Softcam](https://github.com/tshino/softcam), the DirectShow virtual camera our driver is built from (MIT). The Windows build compiles it from source, renamed to Mini Webcam with its own CLSID and a static runtime.
+- [ONNX Runtime](https://github.com/microsoft/onnxruntime) (MIT) and the [MediaPipe](https://github.com/google-ai-edge/mediapipe) selfie segmentation models (Apache-2.0, [ONNX exports by onnx-community](https://huggingface.co/onnx-community/mediapipe_selfie_segmentation)), used for background blur and replacement. The Windows build downloads them on first configure.
 
 ## License
 

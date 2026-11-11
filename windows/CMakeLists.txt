@@ -104,6 +104,37 @@ install(FILES "${SOFTCAM_DIR}/softcam.dll"
   DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
   COMPONENT Runtime)
 
+# Background blur / replacement: ONNX Runtime and the MediaPipe selfie
+# segmentation models, downloaded (pinned by SHA-256) on first configure,
+# never committed.
+set(SEGMENTATION_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/segmentation")
+set(SEGMENTATION_FILES
+  "${SEGMENTATION_DIR}/onnxruntime.dll"
+  "${SEGMENTATION_DIR}/LICENSE.onnxruntime.txt"
+  "${SEGMENTATION_DIR}/ThirdPartyNotices.onnxruntime.txt"
+  "${SEGMENTATION_DIR}/selfie_landscape.onnx"
+  "${SEGMENTATION_DIR}/selfie_square.onnx"
+  "${SEGMENTATION_DIR}/NOTICE.selfie_segmentation.txt")
+set(SEGMENTATION_MISSING FALSE)
+foreach(SEGMENTATION_FILE ${SEGMENTATION_FILES} "${SEGMENTATION_DIR}/onnxruntime_c_api.h")
+  if(NOT EXISTS "${SEGMENTATION_FILE}")
+    set(SEGMENTATION_MISSING TRUE)
+  endif()
+endforeach()
+if(SEGMENTATION_MISSING)
+  message(STATUS "Fetching ONNX Runtime and the segmentation models...")
+  execute_process(
+    COMMAND powershell -NoProfile -ExecutionPolicy Bypass
+            -File "${SEGMENTATION_DIR}/fetch_segmentation.ps1"
+    RESULT_VARIABLE SEGMENTATION_RESULT)
+  if(NOT SEGMENTATION_RESULT EQUAL 0)
+    message(FATAL_ERROR "Segmentation download failed (see output above)")
+  endif()
+endif()
+install(FILES ${SEGMENTATION_FILES}
+  DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+  COMPONENT Runtime)
+
 # Copy the native assets provided by the build.dart from all packages.
 set(NATIVE_ASSETS_DIR "${PROJECT_BUILD_DIR}native_assets/windows/")
 install(DIRECTORY "${NATIVE_ASSETS_DIR}"
