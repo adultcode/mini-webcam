@@ -36,8 +36,18 @@ $Models = @(
 )
 
 function Get-Verified([string]$url, [string]$path, [string]$sha) {
-  Invoke-WebRequest -Uri $url -OutFile $path -UseBasicParsing
-  $hash = (Get-FileHash $path -Algorithm SHA256).Hash
+  # .NET calls instead of Invoke-WebRequest / Get-FileHash: when CMake starts
+  # Windows PowerShell from a PowerShell 7 shell (as in CI), the inherited
+  # PSModulePath hides those cmdlets.
+  (New-Object Net.WebClient).DownloadFile($url, $path)
+  $sha256 = [Security.Cryptography.SHA256]::Create()
+  $stream = [IO.File]::OpenRead($path)
+  try {
+    $hash = [BitConverter]::ToString($sha256.ComputeHash($stream)).Replace('-', '')
+  } finally {
+    $stream.Dispose()
+    $sha256.Dispose()
+  }
   if ($hash -ne $sha) { throw "Checksum mismatch for ${url}: $hash" }
 }
 
